@@ -147,8 +147,8 @@ const MAX_LOGICAL_VOL = 100;
 // 💎最大音量を2倍
 const REAL_VOL_LIMIT = 0.5;
 
-const TICK_DECREASE = DISPLAY_STEP / FADE_TIME_PER_STEP / 60;
-
+const TICK_DECREASE = 1 / 60;
+    
 let state = {
     isPlaying: false,
     logicalVol: 0,
