@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>静寂の盾 (Silence Shield) - Alpha</title>
+    <title>静寂の盾 (Silence Shield) - Brown Noise Edition</title>
     <style>
-        /* --- CSS: デザインとレイアウト --- */
+        /* --- CSS: デザイン --- */
         :root {
-            --bg-color: #1a1a2e; /* 深い紺色 */
+            --bg-color: #1a1a2e;
             --fg-color: #e9e9e9;
-            --accent-color: #4e9af1; /* 落ち着いた青 */
-            --finish-color: #a3cb38; /* 完了時の緑 */
+            --accent-color: #4e9af1;
+            --finish-color: #a3cb38;
             --font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         }
 
@@ -25,11 +25,10 @@
             font-family: var(--font-family);
             display: flex;
             flex-direction: column;
-            user-select: none; /* テキスト選択を無効化（タップ用） */
+            user-select: none;
             -webkit-user-select: none;
         }
 
-        /* 全画面をタップ領域にするためのコンテナ */
         #app-container {
             flex: 1;
             display: flex;
@@ -40,7 +39,6 @@
             cursor: pointer;
         }
 
-        /* 中央のメイン表示エリア */
         #display-area {
             text-align: center;
         }
@@ -51,7 +49,6 @@
             color: var(--accent-color);
         }
 
-        /* 音量を視覚化する輪 */
         #vol-circle {
             width: 200px;
             height: 200px;
@@ -64,23 +61,11 @@
             position: relative;
         }
 
-        #vol-circle::after {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 4px solid var(--accent-color);
-            opacity: 0;
-            transition: transform 0.1s, opacity 0.3s;
-        }
-
         #vol-value {
             font-size: 3rem;
             font-weight: bold;
         }
 
-        /* PC用の操作案内（スマホでは隠す） */
         #pc-instruction {
             margin-top: 20px;
             font-size: 0.9rem;
@@ -91,7 +76,6 @@
             #pc-instruction { display: none; }
         }
 
-        /* ログエリア */
         #log-area {
             height: 150px;
             background-color: rgba(0, 0, 0, 0.3);
@@ -105,26 +89,15 @@
 
         #log-area p { margin: 2px 0; }
 
-        /* 状態ごとのスタイルチェンジ */
-        body.is-playing #vol-circle {
-            transform: scale(1.05);
-        }
-
-        body.is-finished #vol-circle {
-            border-color: var(--finish-color);
-            animation: pulse 2s infinite;
-        }
-
-        body.is-finished #status {
-            color: var(--finish-color);
-        }
+        body.is-playing #vol-circle { transform: scale(1.05); }
+        body.is-finished #vol-circle { border-color: var(--finish-color); animation: pulse 2s infinite; }
+        body.is-finished #status { color: var(--finish-color); }
 
         @keyframes pulse {
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.1); opacity: 0.7; }
             100% { transform: scale(1); opacity: 1; }
         }
-
     </style>
 </head>
 <body>
@@ -139,99 +112,87 @@
         </div>
     </div>
 
-    <div id="log-area" id="log-output">
+    <div id="log-area">
         <p>-- Session Logs --</p>
     </div>
 
     <script>
         /* --- JS: ロジックと音声制御 --- */
 
-        // 設定値
-        const VOL_STEP = 0.1;       // 1回のアップで上がる量 (0.0 - 1.0)
-        const FADE_TIME = 7;       // フェードアウトにかかる時間（秒）
-        const SAMPLE_RATE = 44100; // ホワイトノイズのサンプリングレート
+        const VOL_STEP = 0.1;
+        const FADE_TIME = 7;
 
-        // 状態管理
         let state = {
             isPlaying: false,
             isFinished: false,
             currentVolume: 0,
-            startTime: null,
-            fadeTimer: null, // フェードアウト用のタイマーID
+            fadeTimer: null,
         };
 
-        // Web Audio APIのコンテキスト
         let audioCtx, noiseNode, gainNode;
         const logArea = document.getElementById('log-area');
 
-        // ログ記録関数
         function logEvent(action, extra = '') {
             const now = new Date();
-            const timeStr = now.toISOString().substring(11, 19); // HH:MM:SS
-            const elParams = document.createElement('p');
-            elParams.textContent = `[${timeStr}] ${action.toUpperCase()} - Vol: ${state.currentVolume.toFixed(2)} ${extra}`;
-            logArea.appendChild(elParams);
-            logArea.scrollTop = logArea.scrollHeight; // 最下部へスクロール
-            console.log(`[${timeStr}] ${action}`, state);
+            const timeStr = now.toISOString().substring(11, 19);
+            const el = document.createElement('p');
+            el.textContent = `[${timeStr}] ${action.toUpperCase()} - Vol: ${state.currentVolume.toFixed(2)} ${extra}`;
+            logArea.appendChild(el);
+            logArea.scrollTop = logArea.scrollHeight;
         }
 
-        // ホワイトノイズ生成関数
+        // --- ブラウンノイズ生成 (新しい呪文) ---
         function createWhiteNoise(ctx) {
             const bufferSize = 2 * ctx.sampleRate;
             const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
             const output = buffer.getChannelData(0);
+            
+            let lastOut = 0.0;
             for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1; // -1.0 から 1.0 のランダム値
+                let white = Math.random() * 2 - 1;
+                // ブラウンノイズの計算（高音をカットして低音を強調）
+                output[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = output[i];
+                output[i] *= 3.5; // 音量バランス調整
             }
+            
             const node = ctx.createBufferSource();
             node.buffer = buffer;
             node.loop = true;
             return node;
         }
 
-        // オーディオ環境の初期化
         function initAudio() {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // 1. ノイズ生成
             noiseNode = createWhiteNoise(audioCtx);
-            
-            // 2. ゲインノード（音量調整）
             gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, audioCtx.currentTime); // 初期音量は0
+            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
 
-            // 3. 接続: ノイズ -> ゲイン -> 出力
             noiseNode.connect(gainNode);
             gainNode.connect(audioCtx.destination);
-            
             noiseNode.start();
         }
 
-        // セッション開始
         function startSession() {
             if (!audioCtx) initAudio();
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             state.isPlaying = true;
             state.isFinished = false;
-            state.startTime = new Date();
             document.body.classList.add('is-playing');
             document.body.classList.remove('is-finished');
-            document.getElementById('status').textContent = " Shield Deploying...";
+            document.getElementById('status').textContent = "Shield Deploying...";
             
-            // 初期音量を多めでスタート (例: 0.5)
             setVolumeWithFade(0.5); 
             logEvent('start');
         }
 
-        // セッション停止/完了
         function stopSession(isAutoFinish = false) {
             if (!state.isPlaying) return;
 
             state.isPlaying = false;
             state.currentVolume = 0;
             
-            // 即座に音量を0に
             if (gainNode) {
                 gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
                 gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
@@ -251,75 +212,57 @@
             }
         }
 
-        // 音量設定とフェードアウト予約 (肝の部分)
         function setVolumeWithFade(newVol) {
-            state.currentVolume = Math.min(Math.max(newVol, 0), 1.0); // 0.0 - 1.0 に収める
+            state.currentVolume = Math.min(Math.max(newVol, 0), 1.0);
             document.getElementById('vol-value').textContent = Math.round(state.currentVolume * 100);
 
             const now = audioCtx.currentTime;
-
-            // 1. 現在のフェード予約をすべてキャンセル
             gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now); // 今の音量からスタート
             
-            // 2. 音量を即座に設定 (手動アップ)
-            gainNode.gain.setValueAtTime(state.currentVolume, now);
+            // 手動アップ
+            gainNode.gain.linearRampToValueAtTime(state.currentVolume, now + 0.1);
             
-            // 3. 自動フェードアウトを予約 (現在時刻から FADE_TIME 秒かけて VOL_STEP 分下げる)
-            // exponentialRampだとなだらかで自然
+            // 7秒かけて1段分下げる予約
             const targetVol = Math.max(state.currentVolume - VOL_STEP, 0);
             gainNode.gain.linearRampToValueAtTime(targetVol, now + FADE_TIME);
 
-            logEvent('set_fade', `-> Target: ${targetVol.toFixed(2)} in ${FADE_TIME}s`);
+            logEvent('set_fade', `-> Target: ${targetVol.toFixed(2)}`);
 
-            // JS側でも音量が0になったことを検知するためのタイマー
             clearTimeout(state.fadeTimer);
             if (state.currentVolume > 0) {
-                // 音量に応じた完了タイマーを設定 (1段下がる時間の累計)
-                const timeToZero = (state.currentVolume / VOL_STEP) * FADE_TIME * 1000;
-                
-                // ただし、今回はシンプルに、次の自動ダウンが完了するタイミングでチェック
                 state.fadeTimer = setTimeout(() => {
                     checkAutoFinish();
                 }, FADE_TIME * 1000); 
             }
         }
         
-        // 音量が0になったか定期チェックする（Web AudioのAPI値は直接取れないため）
         function checkAutoFinish() {
             if (!state.isPlaying) return;
             
-            // JS側の内部状態を1段階下げる
             state.currentVolume = Math.max(state.currentVolume - VOL_STEP, 0);
             document.getElementById('vol-value').textContent = Math.round(state.currentVolume * 100);
             logEvent('auto_down_step');
 
             if (state.currentVolume <= 0) {
-                stopSession(true); // 自動完了
+                stopSession(true);
             } else {
-                // まだ残っているなら、次のダウンタイマーを設定
                 state.fadeTimer = setTimeout(() => {
                     checkAutoFinish();
                 }, FADE_TIME * 1000);
             }
         }
 
-
-        // 音量アップ操作 (手動)
         function volumeUp() {
             if (!state.isPlaying) {
                 startSession();
                 return;
             }
             logEvent('op_up');
-            // 現在の音量に 1ステップ足して、フェードを再設定
             setVolumeWithFade(state.currentVolume + VOL_STEP);
         }
 
-        /* --- インターフェース処理 --- */
-
-        // スマホ/PC共通：タップ（クリック）時の処理
         function handleTap() {
-            // セッション中は音量アップ、停止中はスタート
             if (state.isPlaying) {
                 volumeUp();
             } else {
@@ -327,16 +270,14 @@
             }
         }
 
-        // キーボード操作 (PC用)
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
-                e.preventDefault(); // スクロール防止
+                e.preventDefault();
                 volumeUp();
             } else if (e.code === 'KeyS') {
-                stopSession(); // 手動ストップ
+                stopSession();
             }
         });
-
     </script>
 </body>
 </html>
