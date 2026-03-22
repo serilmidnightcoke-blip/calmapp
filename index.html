@@ -7,33 +7,25 @@
     <style>
         :root {
             --bg-color: #0f172a;
-            --fg-color: #e6edf5; /* 目に優しい明るめ */
+            --fg-color: #f1f5f9;
             --accent-color: #38bdf8;
             --finish-color: #4ade80;
+            --text-soft: #cbd5e1;
         }
 
         body, html {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
             background-color: var(--bg-color);
             color: var(--fg-color);
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            display: flex; flex-direction: column;
-            user-select: none; -webkit-user-select: none;
-        }
-
-        /* 🌊 背景ノイズ（ぼかし砂嵐） */
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            background-image:
-                radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
-            background-size: 4px 4px;
-            opacity: 0.5; /* 明るさ50% */
-            filter: blur(2px);
-            z-index: 0;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         #app-container {
@@ -41,7 +33,6 @@
             display: flex;
             position: relative;
             cursor: pointer;
-            z-index: 1;
         }
 
         .tap-zone {
@@ -55,11 +46,14 @@
 
         #center-display {
             position: absolute;
-            top: 50%; left: 50%;
+            top: 50%;
+            left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
             pointer-events: none;
             z-index: 2;
+            width: 90%;
+            max-width: 400px;
         }
 
         #status {
@@ -70,9 +64,11 @@
         }
 
         #vol-circle {
-            width: 220px; height: 220px;
+            width: 220px;
+            height: 220px;
+            margin: 0 auto;
             border-radius: 50%;
-            border: 4px solid rgba(255, 255, 255, 0.15);
+            border: 4px solid rgba(241, 245, 249, 0.1);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -83,20 +79,13 @@
             font-weight: 100;
         }
 
-        #log-area {
-            height: 120px;
-            background: rgba(0, 0, 0, 0.4);
-            overflow-y: auto;
-            padding: 12px;
-            font-family: monospace;
-            font-size: 0.75rem;
-            color: #9fb3c8;
-            z-index: 3;
-        }
-
-        #log-area p {
-            margin: 2px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+        #guide {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: var(--text-soft);
+            text-align: left;
+            white-space: pre-line;
         }
 
         body.is-playing #vol-circle {
@@ -110,23 +99,13 @@
 
         .instruction {
             font-size: 0.7rem;
-            opacity: 0.5;
+            opacity: 0.4;
             margin-top: 10px;
         }
 
-        /* 📘説明テキスト */
-        #guide {
-            position: absolute;
-            bottom: 20px;
-            width: 90%;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.75rem;
-            line-height: 1.4;
-            color: #cfd9e6;
-            text-align: center;
-            opacity: 0.85;
-            z-index: 2;
+        /* ログ非表示 */
+        #log-area {
+            display: none;
         }
     </style>
 </head>
@@ -139,33 +118,23 @@
 
     <div id="center-display">
         <div id="status">TAP TO START</div>
-        <div id="vol-circle"><span id="vol-value">0</span></div>
+
+        <div id="vol-circle">
+            <span id="vol-value">0</span>
+        </div>
+
+        <div id="guide">
+・イヤホンかヘッドホンを着用し、タップしてスタートしてください。リラックス音声が流れます。
+・深呼吸をしながら以下の動作を繰り返してください。
+-意識がノイズの音量に言ったら左をタップ
+-その他の思考（不安や悩み事）に意識が入ったら右をタップ
+・音量がゼロになったらリラックス完了です。
+        </div>
+
         <div class="instruction">[SPACE] UP / [D] DOWN / [S] STOP</div>
     </div>
 
     <div class="tap-zone" onclick="handleRightTap()"><span class="instruction">UP</span></div>
-</div>
-
-<div id="guide">
-🎧 イヤホン / ヘッドホンを着用してタップしてスタート  
-🌊 リラックス音声が流れます  
-
-🫁 深呼吸しながら繰り返す  
-⬅️ ノイズに意識 → 左タップ  
-➡️ 思考に意識 → 右タップ  
-
-💎 音量が0でリラックス完了  
-
-<br><br>
-
-🎧 Put on headphones and tap to start  
-🌊 Relaxing noise will play  
-
-🫁 Breathe slowly and repeat  
-⬅️ Focus on noise → tap LEFT  
-➡️ Thoughts arise → tap RIGHT  
-
-💎 When volume reaches zero, you are calm
 </div>
 
 <div id="log-area"></div>
@@ -174,7 +143,9 @@
 const DISPLAY_STEP = 10;
 const FADE_TIME_PER_STEP = 21;
 const MAX_LOGICAL_VOL = 100;
-const REAL_VOL_LIMIT = 0.5; // 💎2倍
+
+// 💎最大音量を2倍
+const REAL_VOL_LIMIT = 0.5;
 
 const TICK_DECREASE = DISPLAY_STEP / FADE_TIME_PER_STEP / 60;
 
@@ -194,7 +165,6 @@ let sourceNode = null;
 
 function initAudioGraph() {
     if (audioCtx) return;
-
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
     gainNode = audioCtx.createGain();
@@ -207,7 +177,7 @@ function initAudioGraph() {
 
 function logEvent(action) {
     const el = document.createElement('p');
-    el.textContent = `[${new Date().toLocaleTimeString()}] ${action} (${Math.round(state.logicalVol)})`;
+    el.textContent = `[${new Date().toLocaleTimeString()}] ${action} (Disp: ${Math.round(state.logicalVol)})`;
     document.getElementById('log-area').prepend(el);
 }
 
@@ -263,7 +233,7 @@ function handleUp() {
     } else {
         state.logicalVol = Math.min(state.logicalVol + DISPLAY_STEP, MAX_LOGICAL_VOL);
         isManualChange = true;
-        logEvent("UP");
+        logEvent("MANUAL_UP");
     }
 }
 
@@ -271,7 +241,7 @@ function handleDown() {
     if (state.isPlaying) {
         state.logicalVol = Math.max(state.logicalVol - DISPLAY_STEP, 0);
         isManualChange = true;
-        logEvent("DOWN");
+        logEvent("MANUAL_DOWN");
     }
 }
 
