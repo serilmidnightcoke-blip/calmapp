@@ -22,68 +22,151 @@
 </head>
 <body>
 
-    <!-- 🎧 ノイズ -->
-    <audio id="noise" src="calmapp.m4a" loop></audio>
+<audio id="noise" src="calmapp.m4a" loop preload="auto"></audio>
 
-    <div id="app-container">
-        <div class="tap-zone" onclick="handleLeftTap()"><span class="instruction">DOWN</span></div>
-        <div id="center-display">
-            <div id="status">TAP TO START</div>
-            <div id="vol-circle"><span id="vol-value">0</span></div>
-            <div class="instruction">[SPACE] UP / [D] DOWN / [S] STOP</div>
-        </div>
-        <div class="tap-zone" onclick="handleRightTap()"><span class="instruction">UP</span></div>
+<div id="app-container">
+    <div class="tap-zone" onclick="handleLeftTap()"><span class="instruction">DOWN</span></div>
+    <div id="center-display">
+        <div id="status">TAP TO START</div>
+        <div id="vol-circle"><span id="vol-value">0</span></div>
+        <div class="instruction">[SPACE] UP / [D] DOWN / [S] STOP</div>
     </div>
-    <div id="log-area"></div>
+    <div class="tap-zone" onclick="handleRightTap()"><span class="instruction">UP</span></div>
+</div>
 
-    <script>
-        const DISPLAY_STEP = 10;
-        const FADE_TIME_PER_STEP = 21;
-        const MAX_LOGICAL_VOL = 100;
-        const REAL_VOL_LIMIT = 0.25;
+<div id="log-area"></div>
 
-        const TICK_DECREASE = DISPLAY_STEP / FADE_TIME_PER_STEP / 60;
+<script>
+const DISPLAY_STEP = 10;
+const FADE_TIME_PER_STEP = 21;
+const MAX_LOGICAL_VOL = 100;
+const REAL_VOL_LIMIT = 0.25;
 
-        let state = {
-            isPlaying: false,
-            logicalVol: 0,
-            mainLoop: null
-        };
+const TICK_DECREASE = DISPLAY_STEP / FADE_TIME_PER_STEP / 60;
 
-        const audio = document.getElementById("noise");
+let state = {
+    isPlaying: false,
+    logicalVol: 0,
+    mainLoop: null
+};
 
-        function logEvent(action) {
-            const el = document.createElement('p');
-            el.textContent = `[${new Date().toLocaleTimeString()}] ${action} (Disp: ${Math.round(state.logicalVol)})`;
-            document.getElementById('log-area').prepend(el);
+// 💎手動ジャンプフラグ
+let isManualChange = false;
+
+const audio = document.getElementById("noise");
+
+function logEvent(action) {
+    const el = document.createElement('p');
+    el.textContent = `[${new Date().toLocaleTimeString()}] ${action} (Disp: ${Math.round(state.logicalVol)})`;
+    document.getElementById('log-area').prepend(el);
+}
+
+function runLoop() {
+    if (!state.isPlaying) return;
+
+    if (state.logicalVol > 0) {
+        state.logicalVol -= TICK_DECREASE;
+    } else {
+        state.logicalVol = 0;
+        finish();
+        return;
+    }
+
+    let realVol = (state.logicalVol / 100) * REAL_VOL_LIMIT;
+
+    // 💎手動は即ジャンプ / 自動はフェード
+    if (isManualChange) {
+        audio.volume = realVol;
+        isManualChange = false;
+    } else {
+        audio.volume += (realVol - audio.volume) * 0.08;
+    }
+
+    document.getElementById('vol-value').textContent = Math.round(state.logicalVol);
+
+    state.mainLoop = requestAnimationFrame(runLoop);
+}
+
+function startApp() {
+    state.isPlaying = true;
+    state.logicalVol = 100;
+
+    document.body.classList.add('is-playing');
+    document.body.classList.remove('is-finished');
+    document.getElementById('status').textContent = "ACTIVE";
+
+    audio.currentTime = 0;
+    audio.volume = 0;
+
+    audio.play().catch(()=>{});
+
+    logEvent("START");
+
+    runLoop();
+}
+
+function handleUp() {
+    if (!state.isPlaying) {
+        startApp();
+    } else {
+        state.logicalVol = Math.min(state.logicalVol + DISPLAY_STEP, MAX_LOGICAL_VOL);
+        isManualChange = true; // 💎ここ重要
+        logEvent("MANUAL_UP");
+    }
+}
+
+function handleDown() {
+    if (state.isPlaying) {
+        state.logicalVol = Math.max(state.logicalVol - DISPLAY_STEP, 0);
+        isManualChange = true; // 💎ここ重要
+        logEvent("MANUAL_DOWN");
+    }
+}
+
+function stopApp() {
+    if (!state.isPlaying) return;
+
+    logEvent("STOP");
+    state.logicalVol = 0;
+
+    const fadeOut = setInterval(() => {
+        if (audio.volume > 0.01) {
+            audio.volume *= 0.8;
+        } else {
+            audio.volume = 0;
+            audio.pause();
+            clearInterval(fadeOut);
         }
+    }, 16);
 
-        function runLoop() {
-            if (!state.isPlaying) return;
+    finish();
+}
 
-            if (state.logicalVol > 0) {
-                state.logicalVol -= TICK_DECREASE;
-            } else {
-                state.logicalVol = 0;
-                finish();
-                return;
-            }
+function finish() {
+    state.isPlaying = false;
+    cancelAnimationFrame(state.mainLoop);
 
-            let realVol = (state.logicalVol / 100) * REAL_VOL_LIMIT;
+    document.getElementById('vol-value').textContent = "0";
+    document.body.classList.remove('is-playing');
+    document.body.classList.add('is-finished');
+    document.getElementById('status').textContent = "FINISHED";
+}
 
-            // 💎ラグゼロ音量制御
-            audio.volume += (realVol - audio.volume) * 0.1;
+function handleLeftTap() { handleDown(); }
+function handleRightTap() { handleUp(); }
 
-            document.getElementById('vol-value').textContent = Math.round(state.logicalVol);
+window.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (key === ' ') { e.preventDefault(); handleUp(); }
+    if (key === 'd') { e.preventDefault(); handleDown(); }
+    if (key === 's') { stopApp(); }
+});
 
-            requestAnimationFrame(runLoop);
-        }
+// 💎iPhone完全対応
+document.body.addEventListener("touchstart", () => {
+    audio.play().catch(()=>{});
+}, { once: true });
+</script>
 
-        function handleUp() {
-            if (!state.isPlaying) {
-                startApp();
-            } else {
-                state.logicalVol = Math.min(state.logicalVol + DISPLAY_STEP, MAX_LOGICAL_VOL);
-                logEvent("MANUAL_UP");
-            }
-        }
+</body>
+</html>
