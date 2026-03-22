@@ -1,196 +1,273 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>calmapp</title>
-    <style>
-        :root { --bg-color: #0f172a; --fg-color: #f1f5f9; --accent-color: #38bdf8; --finish-color: #4ade80; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: var(--bg-color); color: var(--fg-color); font-family: sans-serif; display: flex; flex-direction: column; user-select: none; -webkit-user-select: none; }
-        #app-container { flex: 1; display: flex; position: relative; cursor: pointer; }
-        .tap-zone { flex: 1; z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #center-display { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; z-index: 2; }
-        #status { font-size: 1.1rem; margin-bottom: 24px; color: var(--accent-color); font-weight: bold; }
-        #vol-circle { width: 220px; height: 220px; border-radius: 50%; border: 4px solid rgba(241, 245, 249, 0.1); display: flex; justify-content: center; align-items: center; }
-        #vol-value { font-size: 4rem; font-weight: 100; }
-        #log-area { height: 120px; background: rgba(0, 0, 0, 0.5); overflow-y: auto; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #94a3b8; z-index: 3; }
-        #log-area p { margin: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        body.is-playing #vol-circle { border-color: var(--accent-color); box-shadow: 0 0 40px rgba(56, 189, 248, 0.2); }
-        body.is-finished #vol-circle { border-color: var(--finish-color); }
-        .instruction { font-size: 0.7rem; opacity: 0.4; margin-top: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>calmapp</title>
+
+<style>
+:root {
+  --bg-color:#0f172a;
+  --fg-color:#e2e8f0; /* 👁️やさしい文字色 */
+  --accent-color:#38bdf8;
+  --finish-color:#4ade80;
+}
+
+body,html{
+  margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background-color:var(--bg-color);
+  color:var(--fg-color);
+  font-family:sans-serif;
+  display:flex;
+  flex-direction:column;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+/* 🌊 背景ノイズ（ぼかし＋50%） */
+#bg-noise{
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  pointer-events:none;
+  z-index:0;
+  opacity:0.5;
+  filter:blur(40px);
+}
+
+/* 🌫️ 読みやすさレイヤー */
+#overlay{
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  background:rgba(0,0,0,0.35);
+  z-index:1;
+}
+
+#app-container{
+  flex:1;
+  display:flex;
+  position:relative;
+  cursor:pointer;
+  z-index:2;
+}
+
+.tap-zone{
+  flex:1;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+#center-display{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  text-align:center;
+  pointer-events:none;
+}
+
+#status{
+  font-size:1.1rem;
+  margin-bottom:20px;
+  color:var(--accent-color);
+}
+
+#vol-circle{
+  width:220px;height:220px;
+  border-radius:50%;
+  border:4px solid rgba(255,255,255,0.15);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+#vol-value{
+  font-size:4rem;
+  font-weight:100;
+}
+
+#instruction-box{
+  position:absolute;
+  bottom:130px;
+  width:100%;
+  text-align:center;
+  font-size:0.75rem;
+  line-height:1.6;
+  opacity:0.85;
+  padding:0 20px;
+}
+
+#log-area{
+  height:120px;
+  background:rgba(0,0,0,0.4);
+  overflow-y:auto;
+  padding:10px;
+  font-family:monospace;
+  font-size:0.7rem;
+  color:#94a3b8;
+  z-index:3;
+}
+
+body.is-playing #vol-circle{
+  border-color:var(--accent-color);
+  box-shadow:0 0 40px rgba(56,189,248,0.2);
+}
+
+body.is-finished #vol-circle{
+  border-color:var(--finish-color);
+}
+</style>
 </head>
+
 <body>
+
+<!-- 🌊 背景砂嵐 -->
+<canvas id="bg-noise"></canvas>
+<div id="overlay"></div>
 
 <audio id="noise" src="calmapp.m4a" loop preload="auto" crossorigin="anonymous"></audio>
 
 <div id="app-container">
-    <div class="tap-zone" onclick="handleLeftTap()"><span class="instruction">DOWN</span></div>
-    <div id="center-display">
-        <div id="status">TAP TO START</div>
-        <div id="vol-circle"><span id="vol-value">0</span></div>
-        <div class="instruction">[SPACE] UP / [D] DOWN / [S] STOP</div>
-    </div>
-    <div class="tap-zone" onclick="handleRightTap()"><span class="instruction">UP</span></div>
+  <div class="tap-zone" onclick="handleLeftTap()">⬇️</div>
+
+  <div id="center-display">
+    <div id="status">TAP TO START</div>
+    <div id="vol-circle"><span id="vol-value">0</span></div>
+  </div>
+
+  <div class="tap-zone" onclick="handleRightTap()">⬆️</div>
+</div>
+
+<!-- 🧠 操作説明 -->
+<div id="instruction-box">
+🧠 思考が出たら → ⬆️ 音量アップ<br>
+🫧 音が気になったら → ⬇️ 音量ダウン<br>
+🌊 何も考えない → そのまま放置<br>
+<br>
+🧠 When thoughts appear → ⬆️ Increase volume<br>
+🫧 When noise feels strong → ⬇️ Decrease volume<br>
+🌊 Stay relaxed → Do nothing
 </div>
 
 <div id="log-area"></div>
 
 <script>
-const DISPLAY_STEP = 10;
-const FADE_TIME_PER_STEP = 21;
-const MAX_LOGICAL_VOL = 100;
-const REAL_VOL_LIMIT = 0.25;
+const DISPLAY_STEP=10;
+const FADE_TIME_PER_STEP=21;
+const MAX_LOGICAL_VOL=100;
+const REAL_VOL_LIMIT=0.25;
+const TICK_DECREASE=DISPLAY_STEP/FADE_TIME_PER_STEP/60;
 
-const TICK_DECREASE = DISPLAY_STEP / FADE_TIME_PER_STEP / 60;
+let state={isPlaying:false,logicalVol:0,mainLoop:null};
+let isManualChange=false;
 
-let state = {
-    isPlaying: false,
-    logicalVol: 0,
-    mainLoop: null
-};
+const audio=document.getElementById("noise");
 
-// 💎手動ジャンプフラグ
-let isManualChange = false;
+let audioCtx=null,gainNode=null,sourceNode=null;
 
-const audio = document.getElementById("noise");
-
-// ===== WebAudio（最小構成：音量だけ制御）=====
-let audioCtx = null;
-let gainNode = null;
-let sourceNode = null;
-
-function initAudioGraph() {
-    if (audioCtx) return; // 1回だけ
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0;
-
-    // ⚠️ 1回しか作れない
-    sourceNode = audioCtx.createMediaElementSource(audio);
-    sourceNode.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-}
-// ===========================================
-
-function logEvent(action) {
-    const el = document.createElement('p');
-    el.textContent = `[${new Date().toLocaleTimeString()}] ${action} (Disp: ${Math.round(state.logicalVol)})`;
-    document.getElementById('log-area').prepend(el);
+function initAudioGraph(){
+  if(audioCtx)return;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  gainNode=audioCtx.createGain();
+  gainNode.gain.value=0;
+  sourceNode=audioCtx.createMediaElementSource(audio);
+  sourceNode.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
 }
 
-function runLoop() {
-    if (!state.isPlaying) return;
-
-    if (state.logicalVol > 0) {
-        state.logicalVol -= TICK_DECREASE;
-    } else {
-        state.logicalVol = 0;
-        finish();
-        return;
-    }
-
-    let realVol = (state.logicalVol / 100) * REAL_VOL_LIMIT;
-
-    // 💎手動は即ジャンプ / 自動はフェード（GainNode版）
-    if (isManualChange) {
-        gainNode.gain.value = realVol;
-        isManualChange = false;
-    } else {
-        gainNode.gain.value += (realVol - gainNode.gain.value) * 0.08;
-    }
-
-    document.getElementById('vol-value').textContent = Math.round(state.logicalVol);
-
-    state.mainLoop = requestAnimationFrame(runLoop);
+function logEvent(a){
+  const el=document.createElement('p');
+  el.textContent=`[${new Date().toLocaleTimeString()}] ${a}`;
+  document.getElementById('log-area').prepend(el);
 }
 
-function startApp() {
-    // 💎ユーザー操作内で初期化＆resume
-    initAudioGraph();
-    audioCtx.resume();
+function runLoop(){
+  if(!state.isPlaying)return;
 
-    state.isPlaying = true;
-    state.logicalVol = 100;
+  if(state.logicalVol>0){state.logicalVol-=TICK_DECREASE;}
+  else{state.logicalVol=0;finish();return;}
 
-    document.body.classList.add('is-playing');
-    document.body.classList.remove('is-finished');
-    document.getElementById('status').textContent = "ACTIVE";
+  let realVol=Math.min(((state.logicalVol/100)*REAL_VOL_LIMIT)*2,1);
 
-    audio.currentTime = 0;
-    gainNode.gain.value = 0;
+  if(isManualChange){
+    gainNode.gain.value=realVol;
+    isManualChange=false;
+  }else{
+    gainNode.gain.value+=(realVol-gainNode.gain.value)*0.08;
+  }
 
-    audio.play().catch(()=>{});
-
-    logEvent("START");
-
-    runLoop();
+  document.getElementById('vol-value').textContent=Math.round(state.logicalVol);
+  state.mainLoop=requestAnimationFrame(runLoop);
 }
 
-function handleUp() {
-    if (!state.isPlaying) {
-        startApp();
-    } else {
-        state.logicalVol = Math.min(state.logicalVol + DISPLAY_STEP, MAX_LOGICAL_VOL);
-        isManualChange = true;
-        logEvent("MANUAL_UP");
-    }
+function startApp(){
+  initAudioGraph();
+  audioCtx.resume();
+
+  state.isPlaying=true;
+  state.logicalVol=100;
+
+  document.body.classList.add('is-playing');
+  document.getElementById('status').textContent="ACTIVE";
+
+  audio.currentTime=0;
+  gainNode.gain.value=0;
+  audio.play().catch(()=>{});
+
+  logEvent("START");
+  runLoop();
 }
 
-function handleDown() {
-    if (state.isPlaying) {
-        state.logicalVol = Math.max(state.logicalVol - DISPLAY_STEP, 0);
-        isManualChange = true;
-        logEvent("MANUAL_DOWN");
-    }
+function handleUp(){
+  if(!state.isPlaying){startApp();}
+  else{
+    state.logicalVol=Math.min(state.logicalVol+DISPLAY_STEP,MAX_LOGICAL_VOL);
+    isManualChange=true;
+    logEvent("UP");
+  }
 }
 
-function stopApp() {
-    if (!state.isPlaying) return;
-
-    logEvent("STOP");
-    state.logicalVol = 0;
-
-    const fadeOut = setInterval(() => {
-        if (gainNode.gain.value > 0.01) {
-            gainNode.gain.value *= 0.8;
-        } else {
-            gainNode.gain.value = 0;
-            audio.pause();
-            clearInterval(fadeOut);
-        }
-    }, 16);
-
-    finish();
+function handleDown(){
+  if(state.isPlaying){
+    state.logicalVol=Math.max(state.logicalVol-DISPLAY_STEP,0);
+    isManualChange=true;
+    logEvent("DOWN");
+  }
 }
 
-function finish() {
-    state.isPlaying = false;
-    cancelAnimationFrame(state.mainLoop);
-
-    document.getElementById('vol-value').textContent = "0";
-    document.body.classList.remove('is-playing');
-    document.body.classList.add('is-finished');
-    document.getElementById('status').textContent = "FINISHED";
+function finish(){
+  state.isPlaying=false;
+  cancelAnimationFrame(state.mainLoop);
+  document.getElementById('status').textContent="FINISHED";
 }
 
-function handleLeftTap() { handleDown(); }
-function handleRightTap() { handleUp(); }
+document.body.addEventListener("touchstart",()=>{
+  initAudioGraph();
+  audioCtx.resume();
+  audio.play().catch(()=>{});
+},{once:true});
 
-window.addEventListener('keydown', (e) => {
-    const key = e.key.toLowerCase();
-    if (key === ' ') { e.preventDefault(); handleUp(); }
-    if (key === 'd') { e.preventDefault(); handleDown(); }
-    if (key === 's') { stopApp(); }
-});
+/* 🌊 背景ノイズ生成 */
+const canvas=document.getElementById("bg-noise");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
 
-// 💎iPhone完全対応（最初のタップで解禁）
-document.body.addEventListener("touchstart", () => {
-    initAudioGraph();
-    audioCtx.resume();
-    audio.play().catch(()=>{});
-}, { once: true });
+function noise(){
+  const img=ctx.createImageData(canvas.width,canvas.height);
+  for(let i=0;i<img.data.length;i+=4){
+    const v=Math.random()*255;
+    img.data[i]=img.data[i+1]=img.data[i+2]=v;
+    img.data[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+}
+setInterval(noise,100);
 </script>
 
 </body>
