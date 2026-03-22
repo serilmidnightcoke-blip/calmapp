@@ -3,289 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>静寂の盾 (Silence Shield) - Deep Warm Edition</title>
+    <title>calmapp</title>
     <style>
-        /* --- CSS: デザイン --- */
-        :root {
-            --bg-color: #1a1a2e;
-            --fg-color: #e9e9e9;
-            --accent-color: #4e9af1;
-            --finish-color: #a3cb38;
-            --font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        }
-
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: var(--bg-color);
-            color: var(--fg-color);
-            font-family: var(--font-family);
-            display: flex;
-            flex-direction: column;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        #app-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            cursor: pointer;
-        }
-
-        #display-area {
-            text-align: center;
-        }
-
-        #status {
-            font-size: 1.2rem;
-            margin-bottom: 20px;
-            color: var(--accent-color);
-        }
-
-        #vol-circle {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            border: 4px solid var(--fg-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: border-color 0.3s, transform 0.1s ease-out;
-            position: relative;
-        }
-
-        #vol-value {
-            font-size: 3rem;
-            font-weight: bold;
-        }
-
-        #pc-instruction {
-            margin-top: 20px;
-            font-size: 0.9rem;
-            opacity: 0.7;
-        }
-
-        @media (max-width: 768px) {
-            #pc-instruction { display: none; }
-        }
-
-        #log-area {
-            height: 150px;
-            background-color: rgba(0, 0, 0, 0.3);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            overflow-y: auto;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 0.8rem;
-            color: #aaa;
-        }
-
-        #log-area p { margin: 2px 0; }
-
-        body.is-playing #vol-circle { transform: scale(1.05); }
-        body.is-finished #vol-circle { border-color: var(--finish-color); animation: pulse 2s infinite; }
-        body.is-finished #status { color: var(--finish-color); }
-
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
-        }
+        :root { --bg-color: #0f172a; --fg-color: #f1f5f9; --accent-color: #38bdf8; --finish-color: #4ade80; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: var(--bg-color); color: var(--fg-color); font-family: sans-serif; display: flex; flex-direction: column; user-select: none; -webkit-user-select: none; }
+        #app-container { flex: 1; display: flex; position: relative; cursor: pointer; }
+        .tap-zone { flex: 1; z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #center-display { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; z-index: 2; }
+        #status { font-size: 1.1rem; margin-bottom: 24px; color: var(--accent-color); font-weight: bold; }
+        #vol-circle { width: 220px; height: 220px; border-radius: 50%; border: 4px solid rgba(241, 245, 249, 0.1); display: flex; justify-content: center; align-items: center; }
+        #vol-value { font-size: 4rem; font-weight: 100; }
+        #log-area { height: 120px; background: rgba(0, 0, 0, 0.5); overflow-y: auto; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #94a3b8; z-index: 3; }
+        #log-area p { margin: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        body.is-playing #vol-circle { border-color: var(--accent-color); box-shadow: 0 0 40px rgba(56, 189, 248, 0.2); }
+        body.is-finished #vol-circle { border-color: var(--finish-color); }
+        .instruction { font-size: 0.7rem; opacity: 0.4; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="app-container" onclick="handleTap()">
-        <div id="display-area">
-            <div id="status">Tap to Start</div>
-            <div id="vol-circle">
-                <span id="vol-value">0</span>
-            </div>
-            <div id="pc-instruction">[SPACE] to UP, [S] to STOP</div>
-        </div>
-    </div>
+    <!-- 🎧 ノイズ -->
+    <audio id="noise" src="calmapp.m4a" loop></audio>
 
-    <div id="log-area">
-        <p>-- Session Logs --</p>
+    <div id="app-container">
+        <div class="tap-zone" onclick="handleLeftTap()"><span class="instruction">DOWN</span></div>
+        <div id="center-display">
+            <div id="status">TAP TO START</div>
+            <div id="vol-circle"><span id="vol-value">0</span></div>
+            <div class="instruction">[SPACE] UP / [D] DOWN / [S] STOP</div>
+        </div>
+        <div class="tap-zone" onclick="handleRightTap()"><span class="instruction">UP</span></div>
     </div>
+    <div id="log-area"></div>
 
     <script>
-        /* --- JS: ロジックと音声制御 --- */
+        const DISPLAY_STEP = 10;
+        const FADE_TIME_PER_STEP = 21;
+        const MAX_LOGICAL_VOL = 100;
+        const REAL_VOL_LIMIT = 0.25;
 
-        const VOL_STEP = 0.1;
-        const FADE_TIME = 7;
+        const TICK_DECREASE = DISPLAY_STEP / FADE_TIME_PER_STEP / 60;
 
         let state = {
             isPlaying: false,
-            isFinished: false,
-            currentVolume: 0,
-            fadeTimer: null,
+            logicalVol: 0,
+            mainLoop: null
         };
 
-        let audioCtx, noiseNode, gainNode, filterNode;
-        const logArea = document.getElementById('log-area');
+        const audio = document.getElementById("noise");
 
-        function logEvent(action, extra = '') {
-            const now = new Date();
-            const timeStr = now.toISOString().substring(11, 19);
+        function logEvent(action) {
             const el = document.createElement('p');
-            el.textContent = `[${timeStr}] ${action.toUpperCase()} - Vol: ${state.currentVolume.toFixed(2)} ${extra}`;
-            logArea.appendChild(el);
-            logArea.scrollTop = logArea.scrollHeight;
+            el.textContent = `[${new Date().toLocaleTimeString()}] ${action} (Disp: ${Math.round(state.logicalVol)})`;
+            document.getElementById('log-area').prepend(el);
         }
 
-        // --- ブラウンノイズ生成 ---
-        function createWhiteNoise(ctx) {
-            const bufferSize = 2 * ctx.sampleRate;
-            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-            const output = buffer.getChannelData(0);
-            
-            let lastOut = 0.0;
-            for (let i = 0; i < bufferSize; i++) {
-                let white = Math.random() * 2 - 1;
-                output[i] = (lastOut + (0.02 * white)) / 1.02;
-                lastOut = output[i];
-                output[i] *= 3.5; 
-            }
-            
-            const node = ctx.createBufferSource();
-            node.buffer = buffer;
-            node.loop = true;
-            return node;
-        }
-
-        // --- オーディオ初期化（フィルター付き） ---
-        function initAudio() {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            noiseNode = createWhiteNoise(audioCtx);
-            
-            // 高音をカットする魔法のフィルター
-            filterNode = audioCtx.createBiquadFilter();
-            filterNode.type = 'lowpass'; 
-            filterNode.frequency.setValueAtTime(450, audioCtx.currentTime); // 450Hz以下を残す（かなりあたたかい音）
-            filterNode.Q.setValueAtTime(0.5, audioCtx.currentTime);
-
-            gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-
-            // 接続: ノイズ -> フィルター -> ゲイン -> スピーカー
-            noiseNode.connect(filterNode);
-            filterNode.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            
-            noiseNode.start();
-        }
-
-        function startSession() {
-            if (!audioCtx) initAudio();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            state.isPlaying = true;
-            state.isFinished = false;
-            document.body.classList.add('is-playing');
-            document.body.classList.remove('is-finished');
-            document.getElementById('status').textContent = "Shield Deploying...";
-            
-            setVolumeWithFade(0.5); 
-            logEvent('start');
-        }
-
-        function stopSession(isAutoFinish = false) {
+        function runLoop() {
             if (!state.isPlaying) return;
 
-            state.isPlaying = false;
-            state.currentVolume = 0;
-            
-            if (gainNode) {
-                gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
-                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-            }
-
-            document.body.classList.remove('is-playing');
-            document.getElementById('vol-value').textContent = "0";
-
-            if (isAutoFinish) {
-                state.isFinished = true;
-                document.body.classList.add('is-finished');
-                document.getElementById('status').textContent = "完了 - Stability Achieved";
-                logEvent('finished');
+            if (state.logicalVol > 0) {
+                state.logicalVol -= TICK_DECREASE;
             } else {
-                document.getElementById('status').textContent = "Tap to Restart";
-                logEvent('stop');
-            }
-        }
-
-        function setVolumeWithFade(newVol) {
-            state.currentVolume = Math.min(Math.max(newVol, 0), 1.0);
-            document.getElementById('vol-value').textContent = Math.round(state.currentVolume * 100);
-
-            const now = audioCtx.currentTime;
-            gainNode.gain.cancelScheduledValues(now);
-            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-            
-            gainNode.gain.linearRampToValueAtTime(state.currentVolume, now + 0.1);
-            
-            const targetVol = Math.max(state.currentVolume - VOL_STEP, 0);
-            gainNode.gain.linearRampToValueAtTime(targetVol, now + FADE_TIME);
-
-            logEvent('set_fade', `-> Target: ${targetVol.toFixed(2)}`);
-
-            clearTimeout(state.fadeTimer);
-            if (state.currentVolume > 0) {
-                state.fadeTimer = setTimeout(() => {
-                    checkAutoFinish();
-                }, FADE_TIME * 1000); 
-            }
-        }
-        
-        function checkAutoFinish() {
-            if (!state.isPlaying) return;
-            
-            state.currentVolume = Math.max(state.currentVolume - VOL_STEP, 0);
-            document.getElementById('vol-value').textContent = Math.round(state.currentVolume * 100);
-            logEvent('auto_down_step');
-
-            if (state.currentVolume <= 0) {
-                stopSession(true);
-            } else {
-                state.fadeTimer = setTimeout(() => {
-                    checkAutoFinish();
-                }, FADE_TIME * 1000);
-            }
-        }
-
-        function volumeUp() {
-            if (!state.isPlaying) {
-                startSession();
+                state.logicalVol = 0;
+                finish();
                 return;
             }
-            logEvent('op_up');
-            setVolumeWithFade(state.currentVolume + VOL_STEP);
+
+            let realVol = (state.logicalVol / 100) * REAL_VOL_LIMIT;
+
+            // 💎ラグゼロ音量制御
+            audio.volume += (realVol - audio.volume) * 0.1;
+
+            document.getElementById('vol-value').textContent = Math.round(state.logicalVol);
+
+            requestAnimationFrame(runLoop);
         }
 
-        function handleTap() {
-            if (state.isPlaying) {
-                volumeUp();
+        function handleUp() {
+            if (!state.isPlaying) {
+                startApp();
             } else {
-                startSession();
+                state.logicalVol = Math.min(state.logicalVol + DISPLAY_STEP, MAX_LOGICAL_VOL);
+                logEvent("MANUAL_UP");
             }
         }
-
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                volumeUp();
-            } else if (e.code === 'KeyS') {
-                stopSession();
-            }
-        });
-    </script>
-</body>
-</html>
