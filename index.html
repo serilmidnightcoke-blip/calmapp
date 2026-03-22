@@ -22,7 +22,7 @@
 </head>
 <body>
 
-<audio id="noise" src="calmapp.m4a" loop preload="auto"></audio>
+<audio id="noise" src="calmapp.m4a" loop preload="auto" crossorigin="anonymous"></audio>
 
 <div id="app-container">
     <div class="tap-zone" onclick="handleLeftTap()"><span class="instruction">DOWN</span></div>
@@ -55,6 +55,25 @@ let isManualChange = false;
 
 const audio = document.getElementById("noise");
 
+// ===== WebAudio（最小構成：音量だけ制御）=====
+let audioCtx = null;
+let gainNode = null;
+let sourceNode = null;
+
+function initAudioGraph() {
+    if (audioCtx) return; // 1回だけ
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0;
+
+    // ⚠️ 1回しか作れない
+    sourceNode = audioCtx.createMediaElementSource(audio);
+    sourceNode.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+}
+// ===========================================
+
 function logEvent(action) {
     const el = document.createElement('p');
     el.textContent = `[${new Date().toLocaleTimeString()}] ${action} (Disp: ${Math.round(state.logicalVol)})`;
@@ -74,12 +93,12 @@ function runLoop() {
 
     let realVol = (state.logicalVol / 100) * REAL_VOL_LIMIT;
 
-    // 💎手動は即ジャンプ / 自動はフェード
+    // 💎手動は即ジャンプ / 自動はフェード（GainNode版）
     if (isManualChange) {
-        audio.volume = realVol;
+        gainNode.gain.value = realVol;
         isManualChange = false;
     } else {
-        audio.volume += (realVol - audio.volume) * 0.08;
+        gainNode.gain.value += (realVol - gainNode.gain.value) * 0.08;
     }
 
     document.getElementById('vol-value').textContent = Math.round(state.logicalVol);
@@ -88,6 +107,10 @@ function runLoop() {
 }
 
 function startApp() {
+    // 💎ユーザー操作内で初期化＆resume
+    initAudioGraph();
+    audioCtx.resume();
+
     state.isPlaying = true;
     state.logicalVol = 100;
 
@@ -96,7 +119,7 @@ function startApp() {
     document.getElementById('status').textContent = "ACTIVE";
 
     audio.currentTime = 0;
-    audio.volume = 0;
+    gainNode.gain.value = 0;
 
     audio.play().catch(()=>{});
 
@@ -110,7 +133,7 @@ function handleUp() {
         startApp();
     } else {
         state.logicalVol = Math.min(state.logicalVol + DISPLAY_STEP, MAX_LOGICAL_VOL);
-        isManualChange = true; // 💎ここ重要
+        isManualChange = true;
         logEvent("MANUAL_UP");
     }
 }
@@ -118,7 +141,7 @@ function handleUp() {
 function handleDown() {
     if (state.isPlaying) {
         state.logicalVol = Math.max(state.logicalVol - DISPLAY_STEP, 0);
-        isManualChange = true; // 💎ここ重要
+        isManualChange = true;
         logEvent("MANUAL_DOWN");
     }
 }
@@ -130,10 +153,10 @@ function stopApp() {
     state.logicalVol = 0;
 
     const fadeOut = setInterval(() => {
-        if (audio.volume > 0.01) {
-            audio.volume *= 0.8;
+        if (gainNode.gain.value > 0.01) {
+            gainNode.gain.value *= 0.8;
         } else {
-            audio.volume = 0;
+            gainNode.gain.value = 0;
             audio.pause();
             clearInterval(fadeOut);
         }
@@ -162,8 +185,10 @@ window.addEventListener('keydown', (e) => {
     if (key === 's') { stopApp(); }
 });
 
-// 💎iPhone完全対応
+// 💎iPhone完全対応（最初のタップで解禁）
 document.body.addEventListener("touchstart", () => {
+    initAudioGraph();
+    audioCtx.resume();
     audio.play().catch(()=>{});
 }, { once: true });
 </script>
