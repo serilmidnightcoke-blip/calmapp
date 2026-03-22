@@ -7,260 +7,247 @@
 
 <style>
 :root {
-  --bg-color:#0f172a;
-  --fg-color:#e2e8f0;
-  --accent-color:#38bdf8;
-  --finish-color:#4ade80;
+    --bg-color: #0f172a;
+    --fg-color: #e2e8f0;
+    --accent-color: #38bdf8;
+    --finish-color: #4ade80;
 }
 
-body,html{
-  margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background-color:var(--bg-color);
-  color:var(--fg-color);
-  font-family:sans-serif;
-  display:flex;
-  flex-direction:column;
-  user-select:none;
-  -webkit-user-select:none;
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: black;
+    color: var(--fg-color);
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
 }
 
-/* 🌊背景 */
-#bg-noise{
-  position:fixed;
-  top:0;left:0;
-  width:100%;height:100%;
-  pointer-events:none;
-  z-index:0;
-  opacity:0.4;
-  filter:blur(30px);
+/* 🌊 背景ノイズ */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: url("https://upload.wikimedia.org/wikipedia/commons/5/57/Noise.png");
+    opacity: 0.5;
+    filter: blur(6px);
+    z-index: 0;
 }
 
-/* 🌫️暗幕 */
-#overlay{
-  position:fixed;
-  top:0;left:0;
-  width:100%;height:100%;
-  background:rgba(0,0,0,0.35);
-  z-index:1;
-  pointer-events:none;
+/* UI上に乗せる */
+#app-container, #log-area {
+    position: relative;
+    z-index: 1;
 }
 
-#app-container{
-  flex:1;
-  display:flex;
-  position:relative;
-  z-index:2;
+#app-container {
+    flex: 1;
+    display: flex;
+    position: relative;
+    cursor: pointer;
 }
 
-.tap-zone{
-  flex:1;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  font-size:1.5rem;
+.tap-zone {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-#center-display{
-  position:absolute;
-  top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  text-align:center;
+#center-display {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
 }
 
-#status{
-  font-size:1.1rem;
-  margin-bottom:20px;
-  color:var(--accent-color);
+#status {
+    font-size: 1.1rem;
+    margin-bottom: 24px;
+    color: var(--accent-color);
+    font-weight: bold;
 }
 
-#vol-circle{
-  width:220px;height:220px;
-  border-radius:50%;
-  border:4px solid rgba(255,255,255,0.15);
-  display:flex;
-  justify-content:center;
-  align-items:center;
+#vol-circle {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-#vol-value{
-  font-size:4rem;
-  font-weight:100;
+#vol-value {
+    font-size: 4rem;
 }
 
-#instruction-box{
-  position:absolute;
-  bottom:120px;
-  width:100%;
-  text-align:center;
-  font-size:0.8rem;
-  line-height:1.6;
-  opacity:0.9;
-  padding:0 20px;
+#instructions {
+    margin-top: 16px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    opacity: 0.85;
 }
 
-#log-area{
-  height:110px;
-  background:rgba(0,0,0,0.4);
-  overflow-y:auto;
-  padding:8px;
-  font-family:monospace;
-  font-size:0.7rem;
-  color:#94a3b8;
-  z-index:3;
+#log-area {
+    height: 120px;
+    background: rgba(0,0,0,0.4);
+    overflow-y: auto;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 0.75rem;
 }
 
-body.is-playing #vol-circle{
-  border-color:var(--accent-color);
-  box-shadow:0 0 40px rgba(56,189,248,0.2);
+body.is-playing #vol-circle {
+    border-color: var(--accent-color);
 }
 
-body.is-finished #vol-circle{
-  border-color:var(--finish-color);
+body.is-finished #vol-circle {
+    border-color: var(--finish-color);
 }
 </style>
 </head>
 
 <body>
 
-<canvas id="bg-noise"></canvas>
-<div id="overlay"></div>
-
 <audio id="noise" src="calmapp.m4a" loop preload="auto" crossorigin="anonymous"></audio>
 
 <div id="app-container">
-  <div class="tap-zone" onclick="handleLeftTap()">⬇️</div>
+    <div class="tap-zone" onclick="handleLeftTap()">⬇️</div>
 
-  <div id="center-display">
-    <div id="status">TAP TO START</div>
-    <div id="vol-circle"><span id="vol-value">0</span></div>
-  </div>
+    <div id="center-display">
+        <div id="status">TAP TO START</div>
 
-  <div class="tap-zone" onclick="handleRightTap()">⬆️</div>
-</div>
+        <div id="vol-circle">
+            <span id="vol-value">0</span>
+        </div>
 
-<!-- 🧠操作説明（改善版） -->
-<div id="instruction-box">
-🧠 考え始めたら → ⬆️タップ（音を上げる）<br>
-🫧 音が気になる → ⬇️タップ（音を下げる）<br>
-🌊 落ち着いてきたら → 何もしない<br>
-<br>
-🧠 When thoughts start → ⬆️ Tap to increase<br>
-🫧 When noise is strong → ⬇️ Tap to decrease<br>
-🌊 When calm → Do nothing
+        <div id="instructions">
+            👉 Tap right / SPACE = 🔊 Up<br>
+            👉 Tap left / D = 🔉 Down<br>
+            👉 S = ⛔ Stop<br><br>
+
+            👉 右タップ / SPACE = 音量アップ<br>
+            👉 左タップ / D = 音量ダウン<br>
+            👉 S = 停止
+        </div>
+    </div>
+
+    <div class="tap-zone" onclick="handleRightTap()">⬆️</div>
 </div>
 
 <div id="log-area"></div>
 
 <script>
-const DISPLAY_STEP=10;
-const FADE_TIME_PER_STEP=21;
-const MAX_LOGICAL_VOL=100;
-const REAL_VOL_LIMIT=0.25;
-const TICK_DECREASE=DISPLAY_STEP/FADE_TIME_PER_STEP/60;
+const DISPLAY_STEP = 10;
+const FADE_TIME_PER_STEP = 21;
+const MAX_LOGICAL_VOL = 100;
+const REAL_VOL_LIMIT = 0.5; // 💎2倍
 
-let state={isPlaying:false,logicalVol:0,mainLoop:null};
-let isManualChange=false;
+const TICK_DECREASE = DISPLAY_STEP / FADE_TIME_PER_STEP / 60;
 
-const audio=document.getElementById("noise");
+let state = {
+    isPlaying: false,
+    logicalVol: 0,
+    mainLoop: null
+};
 
-let audioCtx=null,gainNode=null,sourceNode=null;
+let isManualChange = false;
 
-function initAudioGraph(){
-  if(audioCtx)return;
-  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  gainNode=audioCtx.createGain();
-  gainNode.gain.value=0;
-  sourceNode=audioCtx.createMediaElementSource(audio);
-  sourceNode.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
+const audio = document.getElementById("noise");
+
+let audioCtx = null;
+let gainNode = null;
+let sourceNode = null;
+
+function initAudioGraph() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0;
+
+    sourceNode = audioCtx.createMediaElementSource(audio);
+    sourceNode.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
 }
 
-function logEvent(a){
-  const el=document.createElement('p');
-  el.textContent=`[${new Date().toLocaleTimeString()}] ${a}`;
-  document.getElementById('log-area').prepend(el);
+function logEvent(action) {
+    const el = document.createElement('p');
+    el.textContent = action;
+    document.getElementById('log-area').prepend(el);
 }
 
-function runLoop(){
-  if(!state.isPlaying)return;
+function runLoop() {
+    if (!state.isPlaying) return;
 
-  if(state.logicalVol>0){state.logicalVol-=TICK_DECREASE;}
-  else{state.logicalVol=0;finish();return;}
+    if (state.logicalVol > 0) {
+        state.logicalVol -= TICK_DECREASE;
+    } else {
+        finish();
+        return;
+    }
 
-  let realVol=Math.min(((state.logicalVol/100)*REAL_VOL_LIMIT)*2,1);
+    let realVol = (state.logicalVol / 100) * REAL_VOL_LIMIT;
 
-  if(isManualChange){
-    gainNode.gain.value=realVol;
-    isManualChange=false;
-  }else{
-    gainNode.gain.value+=(realVol-gainNode.gain.value)*0.08;
-  }
+    if (isManualChange) {
+        gainNode.gain.value = realVol;
+        isManualChange = false;
+    } else {
+        gainNode.gain.value += (realVol - gainNode.gain.value) * 0.08;
+    }
 
-  document.getElementById('vol-value').textContent=Math.round(state.logicalVol);
-  state.mainLoop=requestAnimationFrame(runLoop);
+    document.getElementById('vol-value').textContent = Math.round(state.logicalVol);
+
+    state.mainLoop = requestAnimationFrame(runLoop);
 }
 
-function startApp(){
-  initAudioGraph();
-  audioCtx.resume();
+function startApp() {
+    initAudioGraph();
+    audioCtx.resume();
 
-  state.isPlaying=true;
-  state.logicalVol=100;
+    state.isPlaying = true;
+    state.logicalVol = 100;
 
-  document.body.classList.add('is-playing');
-  document.getElementById('status').textContent="ACTIVE";
+    document.body.classList.add('is-playing');
 
-  audio.currentTime=0;
-  gainNode.gain.value=0;
-  audio.play().catch(()=>{});
+    audio.currentTime = 0;
+    gainNode.gain.value = 0;
 
-  logEvent("START");
-  runLoop();
+    audio.play();
+
+    runLoop();
 }
 
-function handleUp(){
-  if(!state.isPlaying){startApp();}
-  else{
-    state.logicalVol=Math.min(state.logicalVol+DISPLAY_STEP,MAX_LOGICAL_VOL);
-    isManualChange=true;
-    logEvent("UP");
-  }
+function handleUp() {
+    if (!state.isPlaying) startApp();
+    else {
+        state.logicalVol += DISPLAY_STEP;
+        isManualChange = true;
+    }
 }
 
-function handleDown(){
-  if(state.isPlaying){
-    state.logicalVol=Math.max(state.logicalVol-DISPLAY_STEP,0);
-    isManualChange=true;
-    logEvent("DOWN");
-  }
+function handleDown() {
+    if (!state.isPlaying) return;
+    state.logicalVol -= DISPLAY_STEP;
+    isManualChange = true;
 }
 
-function finish(){
-  state.isPlaying=false;
-  cancelAnimationFrame(state.mainLoop);
-  document.getElementById('status').textContent="FINISHED";
+function finish() {
+    state.isPlaying = false;
+    cancelAnimationFrame(state.mainLoop);
+    document.body.classList.add('is-finished');
 }
 
-/* 🌊背景ノイズ */
-const canvas=document.getElementById("bg-noise");
-const ctx=canvas.getContext("2d");
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
-
-function noise(){
-  const img=ctx.createImageData(canvas.width,canvas.height);
-  for(let i=0;i<img.data.length;i+=4){
-    const v=Math.random()*255;
-    img.data[i]=img.data[i+1]=img.data[i+2]=v;
-    img.data[i+3]=255;
-  }
-  ctx.putImageData(img,0,0);
-}
-setInterval(noise,120);
+document.body.addEventListener("touchstart", () => {
+    initAudioGraph();
+    audioCtx.resume();
+    audio.play();
+}, { once: true });
 </script>
 
 </body>
