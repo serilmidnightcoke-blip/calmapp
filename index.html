@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>静寂の盾 (Silence Shield) - Brown Noise Edition</title>
+    <title>静寂の盾 (Silence Shield) - Deep Warm Edition</title>
     <style>
         /* --- CSS: デザイン --- */
         :root {
@@ -129,7 +129,7 @@
             fadeTimer: null,
         };
 
-        let audioCtx, noiseNode, gainNode;
+        let audioCtx, noiseNode, gainNode, filterNode;
         const logArea = document.getElementById('log-area');
 
         function logEvent(action, extra = '') {
@@ -141,7 +141,7 @@
             logArea.scrollTop = logArea.scrollHeight;
         }
 
-        // --- ブラウンノイズ生成 (新しい呪文) ---
+        // --- ブラウンノイズ生成 ---
         function createWhiteNoise(ctx) {
             const bufferSize = 2 * ctx.sampleRate;
             const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -150,10 +150,9 @@
             let lastOut = 0.0;
             for (let i = 0; i < bufferSize; i++) {
                 let white = Math.random() * 2 - 1;
-                // ブラウンノイズの計算（高音をカットして低音を強調）
                 output[i] = (lastOut + (0.02 * white)) / 1.02;
                 lastOut = output[i];
-                output[i] *= 3.5; // 音量バランス調整
+                output[i] *= 3.5; 
             }
             
             const node = ctx.createBufferSource();
@@ -162,14 +161,25 @@
             return node;
         }
 
+        // --- オーディオ初期化（フィルター付き） ---
         function initAudio() {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             noiseNode = createWhiteNoise(audioCtx);
+            
+            // 高音をカットする魔法のフィルター
+            filterNode = audioCtx.createBiquadFilter();
+            filterNode.type = 'lowpass'; 
+            filterNode.frequency.setValueAtTime(450, audioCtx.currentTime); // 450Hz以下を残す（かなりあたたかい音）
+            filterNode.Q.setValueAtTime(0.5, audioCtx.currentTime);
+
             gainNode = audioCtx.createGain();
             gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
 
-            noiseNode.connect(gainNode);
+            // 接続: ノイズ -> フィルター -> ゲイン -> スピーカー
+            noiseNode.connect(filterNode);
+            filterNode.connect(gainNode);
             gainNode.connect(audioCtx.destination);
+            
             noiseNode.start();
         }
 
@@ -218,12 +228,10 @@
 
             const now = audioCtx.currentTime;
             gainNode.gain.cancelScheduledValues(now);
-            gainNode.gain.setValueAtTime(gainNode.gain.value, now); // 今の音量からスタート
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
             
-            // 手動アップ
             gainNode.gain.linearRampToValueAtTime(state.currentVolume, now + 0.1);
             
-            // 7秒かけて1段分下げる予約
             const targetVol = Math.max(state.currentVolume - VOL_STEP, 0);
             gainNode.gain.linearRampToValueAtTime(targetVol, now + FADE_TIME);
 
